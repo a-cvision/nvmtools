@@ -22,7 +22,7 @@
 #include <glog/logging.h>
 
 #include <stlplus3/file_system.hpp>
-
+#include <vector>
 #include <nvmtools/NVMFile.h>
 #include <nvmtools/UndistortModel.h>
 
@@ -33,6 +33,8 @@ DEFINE_string(
     outdir, "/tmp",
     "output directory where the undisorted project should be saved to");
 DEFINE_bool(skip_images, false, "do not undistort images");
+DEFINE_int64(userid, -1, "id of the scene user");
+// DEFINE_int64(sceneid, -1, "id of the scene");
 
 // ---------------------------------------------------------
 int main(int argc, char *argv[]) {
@@ -42,8 +44,12 @@ int main(int argc, char *argv[]) {
 
   std::vector<nvmtools::NVM_Model> models;
   nvmtools::NVMFile::readFile(FLAGS_nvm.c_str(), models);
-
-  LOG(INFO) << "loaded " << models.size() << " models from >" << FLAGS_nvm
+  
+  std::vector<std::string> folders_nvm = stlplus::folder_elements(FLAGS_nvm);
+  std::vector<int>::size_type sz = folders_nvm.size();
+  const std::string sceneid = folders_nvm[sz-3];
+  LOG(INFO) << "sceneid is: "<< sceneid;
+  LOG(INFO) << "loaded " << models.size() << " models from path >" << FLAGS_nvm
             << "<";
   if (models.empty()) {
     LOG(WARNING) << "no models -> nothing to do.";
@@ -62,7 +68,7 @@ int main(int argc, char *argv[]) {
     }
 
     CHECK(
-        nvmtools::UndistortModel(models[idx], FLAGS_outdir, !FLAGS_skip_images))
+        nvmtools::UndistortModel(models[idx], FLAGS_outdir, !FLAGS_skip_images, FLAGS_userid, sceneid))
         << "failed to undistort model " << idx;
 
     // int camIdx = 0;
