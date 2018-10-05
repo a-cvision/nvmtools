@@ -49,8 +49,8 @@ bool UndistortImage(const NVM_Camera &camDist,
                                  imgDist.depth(), imgDist.spectrum());
 
   // loop through the pixels
-  for (unsigned y = 0; y < imgRect->height(); y++) {
-    for (unsigned x = 0; x < imgRect->width(); x++) {
+  for (int y = 0; y < imgRect->height(); y++) {
+    for (int x = 0; x < imgRect->width(); x++) {
       Eigen::Vector3d camRay;
       camRay[0] = ((x + 0.0) - imgRect->width() / 2.0) / camRect.f;
       camRay[1] = ((y + 0.0) - imgRect->height() / 2.0) / camRect.f;
@@ -66,7 +66,7 @@ bool UndistortImage(const NVM_Camera &camDist,
       bool inBounds = imgDist.containsXYZC((int)distorted_pixel.x(),
                                            (int)distorted_pixel.y());
 
-      for (unsigned c = 0; c < imgDist.spectrum(); c++) {
+      for (int c = 0; c < imgDist.spectrum(); c++) {
         imgRect->atXY(x, y, c) =
             inBounds
                 ? imgDist.linear_atXY(distorted_pixel.x(), distorted_pixel.y(),
@@ -89,6 +89,7 @@ bool setNVMCameraIntrinsics(NVM_Camera &camera) {
 
   // load the image size
   cimg_library::CImg<unsigned char> img;
+  LOG(INFO)<<"reloading image to set principal points"<<camera.filename;
   img.load(camera.filename.c_str());
   if (img.width() * img.height() == 0) {
     LOG(WARNING) << "could not load image >" << camera.filename << "<";
@@ -156,15 +157,15 @@ Eigen::Vector2d UndistortNVMMeasurement(const NVM_Camera &distCam,
 
 // -------------------------------------------------------------------
 
-bool UndistortModel(const NVM_Model &inModel, const std::string &outFolder,
-                    bool saveImages) {
+bool UndistortModel(NVM_Model &inModel, const std::string &outFolder,
+                    bool saveImages, const int userid, const std::string &sceneid) {
   const size_t nCams = inModel.cameras.size();
   NVM_Model outModel;
   outModel.version = inModel.version;
   cimg_library::CImg<unsigned char> distImg;
   cimg_library::CImg<unsigned char> rectImg;
 
-  std::string outImgFolder = stlplus::create_filespec(outFolder, "images");
+  std::string outImgFolder = stlplus::create_filespec(outFolder, sceneid);
   if (!stlplus::folder_exists(outImgFolder) && saveImages) {
     stlplus::folder_create(outImgFolder);
   }
@@ -173,17 +174,23 @@ bool UndistortModel(const NVM_Model &inModel, const std::string &outFolder,
   std::vector<Eigen::Vector2i> imgSizesBefore(nCams);
   std::vector<Eigen::Vector2i> imgSizesAfter(nCams);
   outModel.cameras.resize(nCams);
+  std::string inputImageFilename;
   for (size_t camIdx = 0; camIdx < nCams; camIdx++) {
-    const NVM_Camera &inCam = inModel.cameras[camIdx];
+    NVM_Camera &inCam = inModel.cameras[camIdx];
 
-    // load the distorted image
+    // load the distorted image from ~/images/userid folder
+    inputImageFilename = "/home/replicate/images/" + std::to_string(userid) + "/" + stlplus::filename_part(inCam.filename);
+    inCam.filename = inputImageFilename;
+    LOG(INFO) << "loading image "<<inCam.filename;
+        
     distImg.load(inCam.filename.c_str());
+    
     if (distImg.width() * distImg.height() == 0) {
-      LOG(WARNING) << "could not load imgae >" << inCam.filename << "< of cam "
+      LOG(WARNING) << "could not load image >" << inCam.filename << "< of cam "
                    << camIdx;
       return false;
     }
-
+    LOG(INFO) <<"image is loaded";
     imgSizesBefore[camIdx] << distImg.width(), distImg.height();
 
     // create the output image
@@ -203,9 +210,9 @@ bool UndistortModel(const NVM_Model &inModel, const std::string &outFolder,
       rectImg.save(outModel.cameras[camIdx].filename.c_str());
       LOG(INFO) << "undistorted img of cam " << camIdx << " and saved it to >"
                 << outModel.cameras[camIdx].filename;
-      distImg.save(stlplus::create_filespec(
-                       outImgFolder, stlplus::filename_part(inCam.filename))
-                       .c_str());
+      //distImg.save(stlplus::create_filespec(
+      //                 outImgFolder, stlplus::filename_part(inCam.filename))
+      //                 .c_str());
     }
   }
 
@@ -230,8 +237,8 @@ bool UndistortModel(const NVM_Model &inModel, const std::string &outFolder,
 
   std::vector<NVM_Model> outModels;
   outModels.push_back(outModel);
-  NVMFile::setRelativePaths(outFolder, outModels);
-  NVMFile::saveNVM(stlplus::create_filespec(outFolder, "model.nvm").c_str(),
+  NVMFile::setRelativePaths(outImgFolder, outModels);
+  NVMFile::saveNVM(stlplus::create_filespec(outImgFolder, "model.nvm").c_str(),
                    outModels, 3);
 
   return true;
