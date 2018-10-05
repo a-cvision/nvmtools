@@ -40,7 +40,7 @@ NVM_Camera CreateUndistortedCamera(const NVM_Camera &distortedCam);
 std::string UndistortedImagePath(const std::string &inImage,
                                  const std::string &outImgFolder);
 
-bool UndistortModel(const NVM_Model &inModel, const std::string &outImgFolder,
-                    bool saveImages = true);
+bool UndistortModel(NVM_Model &inModel, const std::string &outImgFolder,
+                    bool saveImages, const int userid, const std::string &sceneid);
 
 } // namespace nvmtools
